@@ -32,20 +32,6 @@ function silentGetMetadataField(input, fieldName) {
 
 describe('Meta.js DSL Parser', () => {
   
-  describe('Individual Number Parsing', () => {
-    test('should parse whole numbers', () => {
-      expect(parseAndGetResult('25')).toBe(25);
-      expect(parseAndGetResult('0')).toBe(0);
-      expect(parseAndGetResult('100')).toBe(100);
-    });
-
-    test('should parse decimal numbers', () => {
-      expect(parseAndGetResult('25.5')).toBe(25.5);
-      expect(parseAndGetResult('100.75')).toBe(100.75);
-      expect(parseAndGetResult('0.1')).toBe(0.1);
-    });
-  });
-
   describe('Individual Name Parsing', () => {
     test('should parse names correctly', () => {
       expect(parseAndGetResult('John')).toBe('John');
@@ -55,29 +41,28 @@ describe('Meta.js DSL Parser', () => {
     });
   });
 
-  describe('Individual HTTP Method Parsing', () => {
-    test('should parse HTTP methods', () => {
-      expect(parseAndGetResult('GET')).toBe('GET');
-      expect(parseAndGetResult('POST')).toBe('POST');
-      expect(parseAndGetResult('get')).toBe('get'); // Individual parsing preserves case
-      expect(parseAndGetResult('post')).toBe('post'); // Individual parsing preserves case
+  describe('Individual Method Parsing', () => {
+    test('should parse gRPC methods', () => {
+      expect(parseAndGetResult('grpc.health.v1.Health/Check')).toBe('grpc.health.v1.Health/Check');
+      expect(parseAndGetResult('user.v1.UserService/CreateUser')).toBe('user.v1.UserService/CreateUser');
+      expect(parseAndGetResult('SimpleMethod')).toBe('SimpleMethod');
     });
   });
 
   describe('Structured Metadata Parsing', () => {
     test('should parse complete metadata blocks', () => {
-      const result = parseAndGetResult('Metadata{ age: 30, name: roger, http: get }');
-      expect(result).toEqual({ age: 30, name: 'roger', http: 'GET' });
+      const result = parseAndGetResult('Metadata{ name: roger, method: grpc.health.v1.Health/Check }');
+      expect(result).toEqual({ name: 'roger', method: 'grpc.health.v1.Health/Check' });
     });
 
     test('should parse metadata with missing fields', () => {
-      const result = parseAndGetResult('Metadata{ age: 25.5, name: Alice }');
-      expect(result).toEqual({ age: 25.5, name: 'Alice' });
+      const result = parseAndGetResult('Metadata{ name: Alice }');
+      expect(result).toEqual({ name: 'Alice' });
     });
 
     test('should parse metadata with different field order', () => {
-      const result = parseAndGetResult('Metadata{ http: POST, name: Bob, age: 35 }');
-      expect(result).toEqual({ http: 'POST', name: 'Bob', age: 35 });
+      const result = parseAndGetResult('Metadata{ method: grpc.health.v1.Health/Check, name: Bob }');
+      expect(result).toEqual({ method: 'grpc.health.v1.Health/Check', name: 'Bob' });
     });
 
     test('should parse empty metadata block', () => {
@@ -88,40 +73,39 @@ describe('Meta.js DSL Parser', () => {
 
   describe('Whitespace Handling', () => {
     test('should handle no spaces', () => {
-      const result = parseAndGetResult('Metadata{age:30,name:roger,http:get}');
-      expect(result).toEqual({ age: 30, name: 'roger', http: 'GET' });
+      const result = parseAndGetResult('Metadata{name:roger,method:grpc.health.v1.Health/Check}');
+      expect(result).toEqual({ name: 'roger', method: 'grpc.health.v1.Health/Check' });
     });
 
     test('should handle extra spaces', () => {
-      const result = parseAndGetResult('Metadata{ age : 30 , name : roger , http : get }');
-      expect(result).toEqual({ age: 30, name: 'roger', http: 'GET' });
+      const result = parseAndGetResult('Metadata{ name : roger , method : grpc.health.v1.Health/Check }');
+      expect(result).toEqual({ name: 'roger', method: 'grpc.health.v1.Health/Check' });
     });
 
     test('should handle excessive spaces', () => {
-      const result = parseAndGetResult('Metadata{  age  :  30  ,  name  :  roger  }  ');
-      expect(result).toEqual({ age: 30, name: 'roger' });
+      const result = parseAndGetResult('Metadata{  name  :  roger  ,  method  :  grpc.health.v1.Health/Check  }  ');
+      expect(result).toEqual({ name: 'roger', method: 'grpc.health.v1.Health/Check' });
     });
   });
 
   describe('Optional Comma Handling', () => {
     test('should work without trailing comma', () => {
-      const result = parseAndGetResult('Metadata{ age: 30, name: roger }');
-      expect(result).toEqual({ age: 30, name: 'roger' });
+      const result = parseAndGetResult('Metadata{ method: grpc.health.v1.Health/Check, name: roger }');
+      expect(result).toEqual({ method: 'grpc.health.v1.Health/Check', name: 'roger' });
     });
 
     test('should work with trailing comma', () => {
-      const result = parseAndGetResult('Metadata{ age: 30, name: roger, }');
-      expect(result).toEqual({ age: 30, name: 'roger' });
+      const result = parseAndGetResult('Metadata{ method: grpc.health.v1.Health/Check, name: roger, }');
+      expect(result).toEqual({ method: 'grpc.health.v1.Health/Check', name: 'roger' });
     });
   });
 
   describe('Field Extraction Function', () => {
-    const input = 'Metadata{ age: 30, name: roger, http: get }';
+    const input = 'Metadata{ method: grpc.health.v1.Health/Check, name: roger }';
     
     test('should extract existing fields', () => {
-      expect(silentGetMetadataField(input, 'age')).toBe(30);
       expect(silentGetMetadataField(input, 'name')).toBe('roger');
-      expect(silentGetMetadataField(input, 'http')).toBe('GET');
+      expect(silentGetMetadataField(input, 'method')).toBe('grpc.health.v1.Health/Check');
     });
 
     test('should return null for non-existent fields', () => {
@@ -131,20 +115,19 @@ describe('Meta.js DSL Parser', () => {
 
   describe('Invalid Input Handling', () => {
     test('should return null for invalid syntax', () => {
-      expect(parseAndGetResult('Metadata{ age: }')).toBeNull();
-      expect(parseAndGetResult('Metadata{ : 30 }')).toBeNull();
-      expect(parseAndGetResult('Metadata{ age 30 }')).toBeNull();
-      expect(parseAndGetResult('Metadata age: 30 }')).toBeNull();
-      expect(parseAndGetResult('Metadata{ age: 30')).toBeNull();
+      expect(parseAndGetResult('Metadata{ method: }')).toBeNull();
+      expect(parseAndGetResult('Metadata{ : grpc.health.v1.Health/Check }')).toBeNull();
+      expect(parseAndGetResult('Metadata{ method grpc.health.v1.Health/Check }')).toBeNull();
+      expect(parseAndGetResult('Metadata method: grpc.health.v1.Health/Check }')).toBeNull();
+      expect(parseAndGetResult('Metadata{ method: grpc.health.v1.Health/Check')).toBeNull();
     });
   });
 
   describe('Grammar Match Validation', () => {
     test('should match valid inputs', () => {
-      expect(grammar.match('25').succeeded()).toBe(true);
       expect(grammar.match('John').succeeded()).toBe(true);
-      expect(grammar.match('GET').succeeded()).toBe(true);
-      expect(grammar.match('Metadata{ age: 30 }').succeeded()).toBe(true);
+      expect(grammar.match('grpc.health.v1.Health/Check').succeeded()).toBe(true);
+      expect(grammar.match('Metadata{ method: grpc.health.v1.Health/Check }').succeeded()).toBe(true);
     });
 
     test('should not match invalid inputs', () => {
@@ -155,11 +138,11 @@ describe('Meta.js DSL Parser', () => {
 
   describe('testMetadata Function', () => {
     test('should return correct result for valid input', () => {
-      const result = silentTestMetadata('Metadata{ age: 30 }', 'object');
+      const result = silentTestMetadata('Metadata{ method: grpc.health.v1.Health/Check }', 'object');
       
       expect(result.success).toBe(true);
       expect(result.type).toBe('object');
-      expect(result.value).toEqual({ age: 30 });
+      expect(result.value).toEqual({ method: 'grpc.health.v1.Health/Check' });
     });
 
     test('should return failure for invalid input', () => {

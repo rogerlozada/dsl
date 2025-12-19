@@ -3,19 +3,20 @@ const ohm = require('ohm-js');
 // Define a simple grammar for arithmetic expressions
 const grammar = ohm.grammar(`
   Metadata {
-    Exp = MetadataBlock | name | method
+    Exp = MetadataBlock | method | name
     
     MetadataBlock = "Metadata" space* "{" space* MetadataField* space* "}"
     
     MetadataField = space* (nameField | methodField) space*
     
     nameField = "name" space* ":" space* identifier space* ","?
-    methodField = "method" space* ":" space* identifier space* ","?
+    methodField = "method" space* ":" space* methodName space* ","?
     
-    name = letter+
-    method = letter+
+    name = letter (letter | digit)*
+    method = methodName
     
-    identifier = letter+
+    identifier = letter (letter | digit)*
+    methodName = letter (letter | digit | "." | "/" | "_")*
   }
 `);
 
@@ -35,41 +36,23 @@ const semantics = grammar.createSemantics().addOperation('toObject', {
   MetadataField(_s1, field, _s2) {
     return field.toObject();
   },
-  ageField(_, _s1, _colon, _s2, n, _s3, _comma) {
-    return { age: n.toObject() };
-  },
   nameField(_, _s1, _colon, _s2, id, _s3, _comma) {
     return { name: id.toObject() };
   },
-  httpField(_, _s1, _colon, _s2, method, _s3, _comma) {
-    return { http: method.toObject() };
+  methodField(_, _s1, _colon, _s2, methodName, _s3, _comma) {
+    return { method: methodName.toObject() };
   },
-  age(n) {
-    return n.toObject();
+  name(firstLetter, rest) {
+    return firstLetter.sourceString + rest.sourceString;
   },
-  name(letters) {
-    return letters.sourceString;
+  method(methodName) {
+    return methodName.toObject();
   },
-  http(method) {
-    return method.toObject();
+  identifier(firstLetter, rest) {
+    return firstLetter.sourceString + rest.sourceString;
   },
-  identifier(letters) {
-    return letters.sourceString;
-  },
-  httpMethod(method) {
-    return method.toObject();
-  },
-  get(_) {
-    return 'GET';
-  },
-  post(_) {
-    return 'POST';
-  },
-  number_fract(a, _, b) {
-    return parseFloat(a.sourceString + '.' + b.sourceString);
-  },
-  number_whole(a) {
-    return parseInt(a.sourceString);
+  methodName(firstLetter, rest) {
+    return firstLetter.sourceString + rest.sourceString;
   }
 });
 
